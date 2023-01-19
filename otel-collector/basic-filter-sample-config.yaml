@@ -1,0 +1,52 @@
+receivers:
+  otlp:
+    protocols:
+      grpc: # on port 4317
+      http:
+        include_metadata: true
+        cors:
+          allowed_origins:
+            - "http://localhost:19006" 
+            - "http://localhost:3000" 
+            - "https://development.app.yourdomain.com"
+          max_age: 7200
+
+processors:
+  filter:
+    spans:
+      include:
+        match_type: regexp 
+        resources: 
+          - Key: service.namespace
+            Value: (a-service-namespace-you-trust|another-one)
+      exclude:
+        match_type: strict
+        attributes:
+          - Key: http.user_agent
+            Value: ELB-HealthChecker/2.0
+  probabilistic_sampler:
+    hash_seed: 22
+    sampling_percentage: 30 
+  batch:
+
+exporters:
+  otlp:
+    endpoint: "api.honeycomb.io:443"
+    headers:
+      "x-honeycomb-team": "your_api_key"
+      "x-honeycomb-dataset": "your-dataset"
+  logging:
+    loglevel: debug
+
+extensions:
+  health_check:
+  pprof:
+  zpages:
+
+service:
+  extensions: [health_check, pprof, zpages]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [filter,probabilistic_sampler,batch]
+      exporters: [logging,otlp]
